@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from main import *
+from main import *  # Импортируем все функции из основного файла
 
 
 class TestGitVisualization(unittest.TestCase):
@@ -39,15 +39,36 @@ class TestGitVisualization(unittest.TestCase):
         self.assertEqual(commits[0][0], 'mock_commit_hash')
 
     @patch('subprocess.check_output')
-    def test_build_dependency_graph(self, mock_check_output):
+    def test_get_commit_branch(self, mock_check_output):
+        mock_check_output.return_value = '* main\n  dev'
+        commit_hash = 'mock_commit_hash'
+        branches = get_commit_branch(commit_hash)
+        self.assertIn('main', branches)
+        self.assertIn('dev', branches)
+
+    @patch('subprocess.check_output')
+    def test_build_branch_file_graph(self, mock_check_output):
         mock_check_output.return_value = 'mock_parent_hash'
         commits = [
             ('mock_commit_hash', '2024-01-01', 'Author', ['file1', 'file2']),
             ('mock_commit_hash_2', '2024-01-02', 'Author2', ['file3'])]
-        G = build_dependency_graph(commits)
-        self.assertEqual(len(G.nodes), 3)
-        self.assertTrue(G.has_node('mock_commit_hash'))
-        self.assertTrue(G.has_edge('mock_parent_hash', 'mock_commit_hash'))
+        # Подготавливаем mock для веток
+        with patch('main.get_commit_branch', return_value=['main', 'dev']):
+            G = build_branch_file_graph(commits)
+        self.assertEqual(len(G.nodes), 5)  # 2 коммита + 3 файла
+        self.assertTrue(G.has_node('branch_main'))
+        self.assertTrue(G.has_node('branch_dev'))
+        self.assertTrue(G.has_edge('branch_main', 'commit_mock_commit_hash'))
+        self.assertTrue(G.has_edge('commit_mock_commit_hash', 'file_file1'))
+
+    @patch('subprocess.check_output')
+    def test_get_branches(self, mock_check_output):
+        mock_check_output.return_value = 'origin/main\norigin/dev\norigin/feature'
+        repo_dir = 'mock_repo'
+        branches = get_branches(repo_dir)
+        self.assertEqual(len(branches), 3)
+        self.assertIn('main', branches)
+        self.assertIn('dev', branches)
 
     def test_generate_mermaid_graph(self):
         G = nx.DiGraph()
